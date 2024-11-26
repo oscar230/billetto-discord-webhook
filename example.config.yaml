@@ -1,4 +1,5 @@
 database: "postgresql://postgres:password@localhost:5432/database"
+base_url: "https://example.com/"
 interval: "0 */4 * * *"
 webhooks:
   - url: "https://example.com/api/webhooks/123abc"
