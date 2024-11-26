@@ -1,0 +1,8 @@
+database: "postgresql://postgres:password@localhost:5432/database"
+interval: "0 */4 * * *"
+webhooks:
+  - url: "https://example.com/api/webhooks/123abc"
+    events:
+      - 123456
+    enabled: true
+    silent: true
