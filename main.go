@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net"
 	"net/url"
 	"os"
 	"time"
@@ -23,6 +24,7 @@ type Config struct {
 	CronExpression string     `yaml:"interval"`
 	Webhooks       []Webhooks `yaml:"webhooks"`
 	BaseUrl        string     `yaml:"base_url"`
+	UserAgent      string     `yaml:"user_agent"`
 }
 
 type EventAttendee struct {
@@ -73,10 +75,25 @@ func Scrape(config Config) Event {
 		os.Exit(1)
 	}
 
+	// Parse host from URL
+	host, _, err := net.SplitHostPort(baseUrl.Host)
+	if err != nil {
+		log.Fatal("Error parsing URL host:", err)
+		os.Exit(1)
+	}
+
+	// Validate user agent
+	if len(config.UserAgent) < 8 {
+		log.Fatal("User agent too small, make sure it contains contact information: ", config.UserAgent)
+		os.Exit(1)
+	}
+
+	// Create collector
 	collector := colly.NewCollector(
-		colly.AllowedDomains(baseUrl.Host),
+		colly.AllowedDomains(host),
 		colly.AllowURLRevisit(),
 		colly.Async(true),
+		colly.UserAgent(config.UserAgent),
 	)
 
 	// Set error handler
@@ -84,10 +101,11 @@ func Scrape(config Config) Event {
 		log.Print("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
 	})
 
+	// Set limiter
 	collector.Limit(&colly.LimitRule{
-		DomainGlob:  baseUrl.Host + "/*",
-		RandomDelay: 2 * time.Second,
+		DomainGlob:  "*",
 		Delay:       3 * time.Second,
+		Parallelism: 2,
 	})
 
 	// Before making a request
@@ -101,7 +119,8 @@ func Scrape(config Config) Event {
 		log.Printf("Link found: %q -> %s\n", e.Text, link)
 	})
 
-	err = collector.Visit("https://billetto.se/e/1064241/attendees")
+	// Visit event's page
+	err = collector.Visit(baseUrl.JoinPath("e/" + config.Webhooks[0].Events[0]).String())
 	if err != nil {
 		log.Fatal("Error visiting: ", err)
 		os.Exit(1)
