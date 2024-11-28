@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"net"
 	"net/url"
 	"os"
 	"time"
@@ -52,7 +51,6 @@ func loadConfig() Config {
 	file, err := os.Open("config.yaml")
 	if err != nil {
 		log.Fatal("Error opening config file:", err)
-		os.Exit(1)
 	}
 	defer file.Close()
 
@@ -62,7 +60,6 @@ func loadConfig() Config {
 	err = decoder.Decode(&config)
 	if err != nil {
 		log.Fatal("Error decoding config file:", err)
-		os.Exit(1)
 	}
 	return config
 }
@@ -71,28 +68,28 @@ func Scrape(config Config) Event {
 	// Parse the URL
 	baseUrl, err := url.Parse(config.BaseUrl)
 	if err != nil {
-		log.Fatal("Error parsing URL:", err)
-		os.Exit(1)
+		log.Fatal("Error parsing URL: ", err)
 	}
 
-	// Parse host from URL
-	host, _, err := net.SplitHostPort(baseUrl.Host)
-	if err != nil {
-		log.Fatal("Error parsing URL host:", err)
-		os.Exit(1)
-	}
+	// if baseUrl.Port() == "" {
+	// 	log.Fatal("Error parsing URL, port is not set: ", baseUrl)
+	// }
+
+	// // Parse host from URL
+	// host, _, err := net.SplitHostPort(baseUrl.Host)
+	// if err != nil {
+	// 	log.Fatal("Error parsing URL host: ", err)
+	// }
 
 	// Validate user agent
 	if len(config.UserAgent) < 8 {
 		log.Fatal("User agent too small, make sure it contains contact information: ", config.UserAgent)
-		os.Exit(1)
 	}
 
 	// Create collector
 	collector := colly.NewCollector(
-		colly.AllowedDomains(host),
+		colly.AllowedDomains(baseUrl.Hostname()),
 		colly.AllowURLRevisit(),
-		colly.Async(true),
 		colly.UserAgent(config.UserAgent),
 	)
 
@@ -110,7 +107,7 @@ func Scrape(config Config) Event {
 
 	// Before making a request
 	collector.OnRequest(func(r *colly.Request) {
-		log.Print("Visiting", r.URL.String())
+		log.Print("Visiting: ", r.URL.String())
 	})
 
 	// On every a element which has href attribute
@@ -120,10 +117,10 @@ func Scrape(config Config) Event {
 	})
 
 	// Visit event's page
-	err = collector.Visit(baseUrl.JoinPath("e/" + config.Webhooks[0].Events[0]).String())
+	visitUrl := baseUrl.JoinPath("e/" + config.Webhooks[0].Events[0]).String()
+	err = collector.Visit(visitUrl)
 	if err != nil {
 		log.Fatal("Error visiting: ", err)
-		os.Exit(1)
 	}
 
 	return Event{}
@@ -134,8 +131,7 @@ func main() {
 	log.Print("Loaded configuration")
 
 	Scrape(config)
-	log.Print("Done")
-	os.Exit(0)
+	log.Fatal("Done")
 
 	// Create a new cron scheduler
 	scheduler := cron.New()
