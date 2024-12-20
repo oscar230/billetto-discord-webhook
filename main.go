@@ -1,49 +1,63 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"log"
-	"net/url"
+	"net/http"
 	"os"
-	"time"
+	"regexp"
+	"slices"
+	"strconv"
+	"strings"
 
-	"github.com/gocolly/colly"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/robfig/cron/v3"
 	"gopkg.in/yaml.v3"
 )
 
-type Webhooks struct {
-	WebhookUrl string   `yaml:"url"`
-	Events     []string `yaml:"events"`
-	Enabled    bool     `yaml:"enabled"`
-	Silent     bool     `yaml:"silent"`
-}
-
 type Config struct {
-	DatabaseUrl    string     `yaml:"database"`
-	CronExpression string     `yaml:"interval"`
-	Webhooks       []Webhooks `yaml:"webhooks"`
-	BaseUrl        string     `yaml:"base_url"`
-	UserAgent      string     `yaml:"user_agent"`
+	DatabaseUrl    string `yaml:"database"`
+	CronExpression string `yaml:"interval"`
+	Delay          int    `yaml:"delay"`
+	BaseUrl        string `yaml:"base_url"`
+	UserAgent      string `yaml:"user_agent"`
+	WebhookUrl     string `yaml:"webhook"`
+	Event          int    `yaml:"event"`
+	Silent         bool   `yaml:"silent"`
 }
 
-type EventAttendee struct {
-	Url      string
-	Name     string
-	ImageUrl string
-}
-
-type EventOrganizer struct {
-	Url      string
-	Name     string
-	ImageUrl string
-}
-
-type Event struct {
-	Id        string
-	Name      string
-	ImageUrl  string
-	Organizer EventOrganizer
-	Attendees []EventAttendee
+type DiscordWebhookPayload struct {
+	Username  string `json:"username,omitempty"`
+	AvatarURL string `json:"avatar_url,omitempty"`
+	Content   string `json:"content,omitempty"`
+	Embeds    []struct {
+		Author struct {
+			Name    string `json:"name,omitempty"`
+			URL     string `json:"url,omitempty"`
+			IconURL string `json:"icon_url,omitempty"`
+		} `json:"author,omitempty"`
+		Title       string `json:"title,omitempty"`
+		URL         string `json:"url,omitempty"`
+		Description string `json:"description,omitempty"`
+		Color       int    `json:"color,omitempty"`
+		Fields      []struct {
+			Name   string `json:"name,omitempty"`
+			Value  string `json:"value,omitempty"`
+			Inline bool   `json:"inline,omitempty"`
+		} `json:"fields,omitempty"`
+		Thumbnail struct {
+			URL string `json:"url,omitempty"`
+		} `json:"thumbnail,omitempty"`
+		Image struct {
+			URL string `json:"url,omitempty"`
+		} `json:"image,omitempty"`
+		Footer struct {
+			Text    string `json:"text,omitempty"`
+			IconURL string `json:"icon_url,omitempty"`
+		} `json:"footer,omitempty"`
+	} `json:"embeds,omitempty"`
 }
 
 func loadConfig() Config {
@@ -64,80 +78,133 @@ func loadConfig() Config {
 	return config
 }
 
-func Scrape(config Config) Event {
-	// Parse the URL
-	baseUrl, err := url.Parse(config.BaseUrl)
+func GetAttendeeCount(config Config) int {
+	log.Printf("Getting event %d", config.Event)
+
+	// Get first page
+	url := fmt.Sprintf("https://billetto.se/e/%d/attendees?page=1", config.Event)
+	log.Printf("HTTP GET %s", url)
+	resp, err := http.Get(url)
 	if err != nil {
-		log.Fatal("Error parsing URL: ", err)
+		log.Fatal("Failed to fetch the page: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check http response status code
+	if resp.StatusCode != http.StatusOK {
+		log.Fatalf("non-OK HTTP status: %s", resp.Status)
 	}
 
-	// if baseUrl.Port() == "" {
-	// 	log.Fatal("Error parsing URL, port is not set: ", baseUrl)
-	// }
-
-	// // Parse host from URL
-	// host, _, err := net.SplitHostPort(baseUrl.Host)
-	// if err != nil {
-	// 	log.Fatal("Error parsing URL host: ", err)
-	// }
-
-	// Validate user agent
-	if len(config.UserAgent) < 8 {
-		log.Fatal("User agent too small, make sure it contains contact information: ", config.UserAgent)
-	}
-
-	// Create collector
-	collector := colly.NewCollector(
-		colly.AllowedDomains(baseUrl.Hostname()),
-		colly.AllowURLRevisit(),
-		colly.UserAgent(config.UserAgent),
-	)
-
-	// Set error handler
-	collector.OnError(func(r *colly.Response, err error) {
-		log.Print("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
-	})
-
-	// Set limiter
-	collector.Limit(&colly.LimitRule{
-		DomainGlob:  "*",
-		Delay:       3 * time.Second,
-		Parallelism: 2,
-	})
-
-	// Before making a request
-	collector.OnRequest(func(r *colly.Request) {
-		log.Print("Visiting: ", r.URL.String())
-	})
-
-	// On every a element which has href attribute
-	collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Attr("href")
-		log.Printf("Link found: %q -> %s\n", e.Text, link)
-	})
-
-	// Visit event's page
-	visitUrl := baseUrl.JoinPath("e/" + config.Webhooks[0].Events[0]).String()
-	err = collector.Visit(visitUrl)
+	// Load the HTML document
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		log.Fatal("Error visiting: ", err)
+		log.Fatal("Failed to parse HTML: %w", err)
 	}
 
-	return Event{}
+	// Extract matching links
+	var pages []int
+	doc.Find("a").Each(func(index int, element *goquery.Selection) {
+		// Pattern to match links
+		pattern := fmt.Sprintf(`%d/attendees\?page=`, config.Event)
+		// Define a regex to match the pattern
+		re := regexp.MustCompile(pattern)
+		href, exists := element.Attr("href")
+		if exists && re.MatchString(href) {
+			pageNumber, err := strconv.Atoi(strings.Split(href, "?page=")[1])
+			if err != nil {
+				log.Fatal("Failed to conert page number to int: %w", err)
+			}
+			pages = append(pages, pageNumber)
+			// log.Printf("Page: %d", pageNumber)
+		}
+	})
+
+	// Get the maximum page value
+	pageNumberMax := slices.Max(pages)
+	log.Printf("Last page: %d", pageNumberMax)
+
+	// Get last page
+	url = fmt.Sprintf("https://billetto.se/e/%d/attendees?page=%d", config.Event, pageNumberMax)
+	log.Printf("HTTP GET %s", url)
+	resp, err = http.Get(url)
+	if err != nil {
+		log.Fatal("Failed to fetch the page: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check http response status code
+	if resp.StatusCode != http.StatusOK {
+		log.Fatalf("non-OK HTTP status: %s", resp.Status)
+	}
+
+	// Load the HTML document
+	doc, err = goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		log.Fatal("Failed to parse HTML: %w", err)
+	}
+
+	countAttendees := doc.Find("#main-content > main > div > div.grid > div.relative").Length()
+	log.Printf("Last page attendees count: %d", countAttendees)
+	countAttendees += (pageNumberMax - 1) * 4 * 3
+	log.Printf("Total attendees count: %d", countAttendees)
+
+	return countAttendees
+}
+
+func DiscordSend(webhookUrl string, attendeesCount int) {
+	// Create the payload
+	payload := DiscordWebhookPayload{
+		Content: fmt.Sprintf("Test %d", attendeesCount),
+	}
+
+	// Convert the payload to JSON
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		log.Fatal("failed to marshal JSON payload: %w", err)
+	}
+
+	// Create the POST request
+	req, err := http.NewRequest("POST", webhookUrl, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		log.Fatal("failed to create HTTP request: %w", err)
+	}
+	log.Printf("HTTP POST %s\n%s", req.URL, req.Body)
+
+	// Set headers
+	req.Header.Set("Content-Type", "application/json")
+
+	// Send the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal("failed to send HTTP request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check the response status
+	if resp.StatusCode != http.StatusNoContent {
+		log.Fatalf("unexpected response from Discord: %s", resp.Status)
+	}
+
+	log.Printf("Webhook sent.")
 }
 
 func main() {
 	config := loadConfig()
 	log.Print("Loaded configuration")
 
-	Scrape(config)
-	log.Fatal("Done")
+	attendees := GetAttendeeCount(config)
+	DiscordSend(config.WebhookUrl, attendees)
+	os.Exit(1)
 
 	// Create a new cron scheduler
 	scheduler := cron.New()
 
 	// Add a task with a cron expression
-	scheduler.AddFunc(config.CronExpression, func() { Scrape(config) })
+	scheduler.AddFunc(config.CronExpression, func() {
+		attendees := GetAttendeeCount(config)
+		DiscordSend(config.WebhookUrl, attendees)
+	})
 
 	// Start the cron scheduler
 	scheduler.Start()
