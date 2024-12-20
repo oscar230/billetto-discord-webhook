@@ -6,3 +6,6 @@ delay: 3
 webhook: "https://example.com/api/webhooks/123abc"
 event: 123456
 silent: true
+event_title: "Example event!"
+event_url: "https://example.com/"
+event_image_url: "https://example.com/image.png"

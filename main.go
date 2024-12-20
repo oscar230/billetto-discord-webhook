@@ -11,9 +11,9 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/robfig/cron/v3"
 	"gopkg.in/yaml.v3"
 )
 
@@ -26,38 +26,58 @@ type Config struct {
 	WebhookUrl     string `yaml:"webhook"`
 	Event          int    `yaml:"event"`
 	Silent         bool   `yaml:"silent"`
+	Title          string `yaml:"event_title"`
+	Url            string `yaml:"event_url"`
+	ImageUrl       string `yaml:"event_image_url"`
 }
 
-type DiscordWebhookPayload struct {
-	Username  string `json:"username,omitempty"`
-	AvatarURL string `json:"avatar_url,omitempty"`
-	Content   string `json:"content,omitempty"`
-	Embeds    []struct {
-		Author struct {
-			Name    string `json:"name,omitempty"`
-			URL     string `json:"url,omitempty"`
-			IconURL string `json:"icon_url,omitempty"`
-		} `json:"author,omitempty"`
-		Title       string `json:"title,omitempty"`
-		URL         string `json:"url,omitempty"`
-		Description string `json:"description,omitempty"`
-		Color       int    `json:"color,omitempty"`
-		Fields      []struct {
-			Name   string `json:"name,omitempty"`
-			Value  string `json:"value,omitempty"`
-			Inline bool   `json:"inline,omitempty"`
-		} `json:"fields,omitempty"`
-		Thumbnail struct {
-			URL string `json:"url,omitempty"`
-		} `json:"thumbnail,omitempty"`
-		Image struct {
-			URL string `json:"url,omitempty"`
-		} `json:"image,omitempty"`
-		Footer struct {
-			Text    string `json:"text,omitempty"`
-			IconURL string `json:"icon_url,omitempty"`
-		} `json:"footer,omitempty"`
-	} `json:"embeds,omitempty"`
+type EmbedAuthor struct {
+	Name    string `json:"name,omitempty"`
+	URL     string `json:"url,omitempty"`
+	IconURL string `json:"icon_url,omitempty"`
+}
+
+type EmbedField struct {
+	Name   string `json:"name,omitempty"`
+	Value  string `json:"value,omitempty"`
+	Inline bool   `json:"inline,omitempty"`
+}
+
+type EmbedThumbnail struct {
+	URL string `json:"url,omitempty"`
+}
+
+type EmbedImage struct {
+	URL string `json:"url,omitempty"`
+}
+
+type EmbedFooter struct {
+	Text    string `json:"text,omitempty"`
+	IconURL string `json:"icon_url,omitempty"`
+}
+
+type Embed struct {
+	Author      EmbedAuthor    `json:"author,omitempty"`
+	Title       string         `json:"title,omitempty"`
+	URL         string         `json:"url,omitempty"`
+	Description string         `json:"description,omitempty"`
+	Color       int            `json:"color,omitempty"`
+	Fields      []EmbedField   `json:"fields,omitempty"`
+	Thumbnail   EmbedThumbnail `json:"thumbnail,omitempty"`
+	Image       EmbedImage     `json:"image,omitempty"`
+	Footer      EmbedFooter    `json:"footer,omitempty"`
+}
+
+type Message struct {
+	Username  string  `json:"username,omitempty"`
+	AvatarURL string  `json:"avatar_url,omitempty"`
+	Content   string  `json:"content,omitempty"`
+	Embeds    []Embed `json:"embeds,omitempty"`
+}
+
+type StoredAttendees struct {
+	Datetime string `json:"datetime"`
+	Count    int    `json:"count"`
 }
 
 func loadConfig() Config {
@@ -151,10 +171,19 @@ func GetAttendeeCount(config Config) int {
 	return countAttendees
 }
 
-func DiscordSend(webhookUrl string, attendeesCount int) {
+func DiscordSend(currentAttendees, pastAttendees StoredAttendees, config Config) {
 	// Create the payload
-	payload := DiscordWebhookPayload{
-		Content: fmt.Sprintf("Test %d", attendeesCount),
+	payload := Message{
+		Embeds: []Embed{
+			{
+				Title:       config.Title,
+				Description: fmt.Sprintf("**Det är %d registrerade besökare.**\nSenaste kontroll var vid *%s* då fanns det %d registrerade besökare.", currentAttendees.Count, pastAttendees.Datetime, pastAttendees.Count),
+				URL:         config.Url,
+				Image: EmbedImage{
+					URL: config.ImageUrl,
+				},
+			},
+		},
 	}
 
 	// Convert the payload to JSON
@@ -164,7 +193,7 @@ func DiscordSend(webhookUrl string, attendeesCount int) {
 	}
 
 	// Create the POST request
-	req, err := http.NewRequest("POST", webhookUrl, bytes.NewBuffer(payloadBytes))
+	req, err := http.NewRequest("POST", config.WebhookUrl, bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		log.Fatal("failed to create HTTP request: %w", err)
 	}
@@ -185,31 +214,78 @@ func DiscordSend(webhookUrl string, attendeesCount int) {
 	if resp.StatusCode != http.StatusNoContent {
 		log.Fatalf("unexpected response from Discord: %s", resp.Status)
 	}
+}
 
-	log.Printf("Webhook sent.")
+func WriteFile(data StoredAttendees) error {
+	file, err := os.Create("./event.json")
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ") // Pretty-print JSON for readability
+	if err := encoder.Encode(data); err != nil {
+		return fmt.Errorf("failed to write JSON to file: %w", err)
+	}
+
+	return nil
+}
+
+func ReadFile() (StoredAttendees, error) {
+	var data StoredAttendees
+	file, err := os.Open("./event.json")
+	if err != nil {
+		return data, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&data); err != nil {
+		return data, fmt.Errorf("failed to decode JSON from file: %w", err)
+	}
+
+	return data, nil
 }
 
 func main() {
 	config := loadConfig()
 	log.Print("Loaded configuration")
 
-	attendees := GetAttendeeCount(config)
-	DiscordSend(config.WebhookUrl, attendees)
+	// attendees := GetAttendeeCount(config)
+	attendees := 10
+	pastAttendees, err := ReadFile()
+	if err != nil {
+		log.Print("Failed to read past attendees file, will use default values: %w", err)
+		pastAttendees = StoredAttendees{
+			Datetime: time.Now().UTC().Format(time.RFC3339),
+			Count:    -1,
+		}
+	}
+	currentAttendees := StoredAttendees{
+		Datetime: time.Now().UTC().Format(time.RFC3339),
+		Count:    attendees,
+	}
+	if currentAttendees.Count != pastAttendees.Count && pastAttendees.Count != -1 {
+		DiscordSend(currentAttendees, pastAttendees, config)
+	}
+	WriteFile(currentAttendees)
+
 	os.Exit(1)
 
-	// Create a new cron scheduler
-	scheduler := cron.New()
+	// // Create a new cron scheduler
+	// scheduler := cron.New()
 
-	// Add a task with a cron expression
-	scheduler.AddFunc(config.CronExpression, func() {
-		attendees := GetAttendeeCount(config)
-		DiscordSend(config.WebhookUrl, attendees)
-	})
+	// // Add a task with a cron expression
+	// scheduler.AddFunc(config.CronExpression, func() {
+	// 	attendees := GetAttendeeCount(config)
+	// 	DiscordSend(config, attendees)
+	// })
 
-	// Start the cron scheduler
-	scheduler.Start()
-	log.Print("Scheduler started.")
+	// // Start the cron scheduler
+	// scheduler.Start()
+	// log.Print("Scheduler started.")
 
-	// Keep the program running to observe scheduled tasks
-	select {}
+	// // Keep the program running to observe scheduled tasks
+	// select {}
 }
