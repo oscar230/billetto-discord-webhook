@@ -247,6 +247,7 @@ func ReadFile() (StoredAttendees, error) {
 }
 
 func Job(config Config) {
+	log.Printf("Running job for event %d", config.Event)
 	// attendees := GetAttendeeCount(config)
 	attendees := 10
 	pastAttendees, err := ReadFile()
@@ -263,6 +264,8 @@ func Job(config Config) {
 	}
 	if currentAttendees.Count != pastAttendees.Count && pastAttendees.Count != -1 {
 		DiscordSend(currentAttendees, pastAttendees, config)
+	} else {
+		log.Printf("Current is %d (now) and past is %d (%s), there is nothing to do.", currentAttendees.Count, pastAttendees.Count, pastAttendees.Datetime)
 	}
 	WriteFile(currentAttendees)
 }
