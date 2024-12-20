@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"regexp"
@@ -171,14 +172,34 @@ func GetAttendeeCount(config Config) int {
 
 func DiscordSend(currentAttendees, pastAttendees StoredAttendees, config Config) {
 	// Create the payload
+	var changeText string
+	if currentAttendees.Count > pastAttendees.Count {
+		changeText = fmt.Sprintf("↗️ Detta är en ökning med %d besökare.\n", currentAttendees.Count-pastAttendees.Count)
+	} else if currentAttendees.Count < pastAttendees.Count {
+		changeText = fmt.Sprintf("↘️ Detta är en minskning med %d besökare.\n", pastAttendees.Count-currentAttendees.Count)
+	} else {
+		changeText = ""
+	}
 	payload := Message{
 		Embeds: []Embed{
 			{
 				Title:       config.Title,
-				Description: fmt.Sprintf("**Det är %d registrerade besökare.**\nSenaste kontroll var vid *%s* då fanns det %d registrerade besökare.", currentAttendees.Count, pastAttendees.Datetime, pastAttendees.Count),
+				Description: fmt.Sprintf("# 🎟️ %d besökare", currentAttendees.Count),
 				URL:         config.Url,
 				Image: EmbedImage{
 					URL: config.ImageUrl,
+				},
+				Fields: []EmbedField{
+					{
+						Name:   "Föregående mätning",
+						Value:  fmt.Sprintf("🗓️ %dst besökare vid mätning %s UTC.", pastAttendees.Count, pastAttendees.Datetime),
+						Inline: false,
+					},
+					{
+						Name:   "Förändring",
+						Value:  changeText,
+						Inline: false,
+					},
 				},
 			},
 		},
@@ -249,7 +270,7 @@ func ReadFile() (StoredAttendees, error) {
 func Job(config Config) {
 	log.Printf("Running job for event %d", config.Event)
 	// attendees := GetAttendeeCount(config)
-	attendees := 10
+	attendees := rand.Intn(200) // TESTING
 	pastAttendees, err := ReadFile()
 	if err != nil {
 		log.Print("Failed to read past attendees file, will use default values: %w", err)
