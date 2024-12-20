@@ -1,8 +1,5 @@
-database: "postgresql://postgres:password@localhost:5432/database"
 base_url: "https://example.com/"
-user_agent: "Bot (contact info here)"
 interval: "0 */4 * * *"
-delay: 3
 webhook: "https://example.com/api/webhooks/123abc"
 event: 123456
 silent: true

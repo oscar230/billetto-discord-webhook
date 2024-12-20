@@ -14,15 +14,13 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/robfig/cron"
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	DatabaseUrl    string `yaml:"database"`
 	CronExpression string `yaml:"interval"`
-	Delay          int    `yaml:"delay"`
 	BaseUrl        string `yaml:"base_url"`
-	UserAgent      string `yaml:"user_agent"`
 	WebhookUrl     string `yaml:"webhook"`
 	Event          int    `yaml:"event"`
 	Silent         bool   `yaml:"silent"`
@@ -248,10 +246,7 @@ func ReadFile() (StoredAttendees, error) {
 	return data, nil
 }
 
-func main() {
-	config := loadConfig()
-	log.Print("Loaded configuration")
-
+func Job(config Config) {
 	// attendees := GetAttendeeCount(config)
 	attendees := 10
 	pastAttendees, err := ReadFile()
@@ -270,22 +265,22 @@ func main() {
 		DiscordSend(currentAttendees, pastAttendees, config)
 	}
 	WriteFile(currentAttendees)
+}
 
-	os.Exit(1)
+func main() {
+	config := loadConfig()
+	log.Print("Loaded configuration")
 
-	// // Create a new cron scheduler
-	// scheduler := cron.New()
+	// Create a new cron scheduler
+	scheduler := cron.New()
 
-	// // Add a task with a cron expression
-	// scheduler.AddFunc(config.CronExpression, func() {
-	// 	attendees := GetAttendeeCount(config)
-	// 	DiscordSend(config, attendees)
-	// })
+	// Add a task with a cron expression
+	scheduler.AddFunc(config.CronExpression, func() { Job(config) })
 
-	// // Start the cron scheduler
-	// scheduler.Start()
-	// log.Print("Scheduler started.")
+	// Start the cron scheduler
+	scheduler.Start()
+	log.Print("Scheduler started.")
 
-	// // Keep the program running to observe scheduled tasks
-	// select {}
+	// Keep the program running to observe scheduled tasks
+	select {}
 }
