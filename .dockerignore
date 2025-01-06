@@ -1,0 +1,7 @@
+.drone.yml
+.gitignore
+config.yaml
+event.json
+example.config.yaml
+LICENSE
+*.md

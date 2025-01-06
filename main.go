@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"regexp"
@@ -269,8 +268,7 @@ func ReadFile() (StoredAttendees, error) {
 
 func Job(config Config) {
 	log.Printf("Running job for event %d", config.Event)
-	// attendees := GetAttendeeCount(config)
-	attendees := rand.Intn(200) // TESTING
+	attendees := GetAttendeeCount(config)
 	pastAttendees, err := ReadFile()
 	if err != nil {
 		log.Print("Failed to read past attendees file, will use default values: %w", err)
