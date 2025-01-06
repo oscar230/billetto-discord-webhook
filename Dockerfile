@@ -12,7 +12,7 @@ RUN go build -o main .
 FROM alpine:latest  
 # Set up certificates and other required tools
 RUN apk --no-cache add ca-certificates
-WORKDIR /root/
+WORKDIR /app/
 # Copy binary from previous stage
 COPY --from=builder /app/main .
 # Run binary
