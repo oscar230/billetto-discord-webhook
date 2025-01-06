@@ -15,5 +15,6 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /app/
 # Copy binary from previous stage
 COPY --from=builder /app/main .
+RUN ls -la
 # Run binary
 CMD ["./main"]
