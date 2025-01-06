@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/robfig/cron"
+	"github.com/robfig/cron/v3"
 	"gopkg.in/yaml.v3"
 )
 

@@ -1,5 +1,5 @@
 base_url: "https://example.com/"
-interval: "0 */4 * * *"
+interval: "0 */1 * * *"
 webhook: "https://example.com/api/webhooks/123abc"
 event: 123456
 silent: true
