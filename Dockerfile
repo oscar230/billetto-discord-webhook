@@ -7,7 +7,7 @@ RUN go mod download
 # Copy source code
 COPY *.go ./
 # Build
-RUN go build -o main .
+RUN GOOS=linux GOARCH=amd64 go build -o main .
 
 FROM alpine:latest  
 # Set up certificates and other required tools
