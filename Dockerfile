@@ -12,7 +12,7 @@ RUN GOOS=linux GOARCH=arm64 go build -o main .
 FROM alpine:latest  
 # Set up certificates and other required tools
 # Adds libc6-compat for compatability
-RUN apk --no-cache add ca-certificates libc6-compat
+RUN apk --no-cache add ca-certificates libc6-compat tzdata
 WORKDIR /app/
 # Copy binary from previous stage
 COPY --from=builder /app/main .
