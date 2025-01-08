@@ -301,7 +301,7 @@ func main() {
 
 	// Start the cron scheduler
 	scheduler.Start()
-	log.Print("Scheduler started.")
+	log.Printf("Scheduler started at system time: %s", time.Now())
 
 	// Keep the program running to observe scheduled tasks
 	select {}
