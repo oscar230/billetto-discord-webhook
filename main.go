@@ -1,12 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	webhook "oscar230/billetto-discord-webhook/discord"
 	"regexp"
 	"slices"
 	"strconv"
@@ -25,50 +25,6 @@ type Config struct {
 	Title          string `yaml:"event_title"`
 	Url            string `yaml:"event_url"`
 	ImageUrl       string `yaml:"event_image_url"`
-}
-
-type EmbedAuthor struct {
-	Name    string `json:"name,omitempty"`
-	URL     string `json:"url,omitempty"`
-	IconURL string `json:"icon_url,omitempty"`
-}
-
-type EmbedField struct {
-	Name   string `json:"name,omitempty"`
-	Value  string `json:"value,omitempty"`
-	Inline bool   `json:"inline,omitempty"`
-}
-
-type EmbedThumbnail struct {
-	URL string `json:"url,omitempty"`
-}
-
-type EmbedImage struct {
-	URL string `json:"url,omitempty"`
-}
-
-type EmbedFooter struct {
-	Text    string `json:"text,omitempty"`
-	IconURL string `json:"icon_url,omitempty"`
-}
-
-type Embed struct {
-	Author      EmbedAuthor    `json:"author,omitempty"`
-	Title       string         `json:"title,omitempty"`
-	URL         string         `json:"url,omitempty"`
-	Description string         `json:"description,omitempty"`
-	Color       int            `json:"color,omitempty"`
-	Fields      []EmbedField   `json:"fields,omitempty"`
-	Thumbnail   EmbedThumbnail `json:"thumbnail,omitempty"`
-	Image       EmbedImage     `json:"image,omitempty"`
-	Footer      EmbedFooter    `json:"footer,omitempty"`
-}
-
-type Message struct {
-	Username  string  `json:"username,omitempty"`
-	AvatarURL string  `json:"avatar_url,omitempty"`
-	Content   string  `json:"content,omitempty"`
-	Embeds    []Embed `json:"embeds,omitempty"`
 }
 
 type StoredAttendees struct {
@@ -167,71 +123,6 @@ func GetAttendeeCount(config Config) int {
 	return countAttendees
 }
 
-func DiscordSend(currentAttendees, pastAttendees StoredAttendees, config Config) {
-	// Create the payload
-	var changeText string
-	if currentAttendees.Count > pastAttendees.Count {
-		changeText = fmt.Sprintf("↗️ Detta är en ökning med %d besökare.\n", currentAttendees.Count-pastAttendees.Count)
-	} else if currentAttendees.Count < pastAttendees.Count {
-		changeText = fmt.Sprintf("↘️ Detta är en minskning med %d besökare.\n", pastAttendees.Count-currentAttendees.Count)
-	} else {
-		changeText = ""
-	}
-	payload := Message{
-		Embeds: []Embed{
-			{
-				Title:       config.Title,
-				Description: fmt.Sprintf("# 🎟️ %d besökare", currentAttendees.Count),
-				URL:         config.Url,
-				Image: EmbedImage{
-					URL: config.ImageUrl,
-				},
-				Fields: []EmbedField{
-					{
-						Name:   "Föregående mätning",
-						Value:  fmt.Sprintf("🗓️ %dst besökare vid mätning %s UTC.", pastAttendees.Count, pastAttendees.Datetime),
-						Inline: false,
-					},
-					{
-						Name:   "Förändring",
-						Value:  changeText,
-						Inline: false,
-					},
-				},
-			},
-		},
-	}
-
-	// Convert the payload to JSON
-	payloadBytes, err := json.Marshal(payload)
-	if err != nil {
-		log.Fatal("failed to marshal JSON payload: %w", err)
-	}
-
-	// Create the POST request
-	req, err := http.NewRequest("POST", config.WebhookUrl, bytes.NewBuffer(payloadBytes))
-	if err != nil {
-		log.Fatal("failed to create HTTP request: %w", err)
-	}
-	log.Printf("HTTP POST %s\n%s", req.URL, req.Body)
-
-	// Set headers
-	req.Header.Set("Content-Type", "application/json")
-
-	// Send the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatal("failed to send HTTP request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check the response status
-	if resp.StatusCode != http.StatusNoContent {
-		log.Fatalf("unexpected response from Discord: %s", resp.Status)
-	}
-}
-
 func WriteFile(data StoredAttendees) error {
 	file, err := os.Create("./event.json")
 	if err != nil {
@@ -262,6 +153,51 @@ func ReadFile() (StoredAttendees, error) {
 	}
 
 	return data, nil
+}
+
+func DiscordSend(currentAttendees, pastAttendees StoredAttendees, config Config) {
+	// Create the message variables
+	var changeText string
+	if currentAttendees.Count > pastAttendees.Count {
+		changeText = fmt.Sprintf("↗️ Detta är en ökning med %d besökare.\n", currentAttendees.Count-pastAttendees.Count)
+	} else if currentAttendees.Count < pastAttendees.Count {
+		changeText = fmt.Sprintf("↘️ Detta är en minskning med %d besökare.\n", pastAttendees.Count-currentAttendees.Count)
+	} else {
+		changeText = ""
+	}
+
+	// Create the message
+	inlineFields := false
+	message := webhook.Message{
+		Embeds: []webhook.Embed{
+			{
+				Title:       config.Title,
+				Description: fmt.Sprintf("# 🎟️ %d besökare", currentAttendees.Count),
+				URL:         config.Url,
+				Image: webhook.EmbedImage{
+					URL: config.ImageUrl,
+				},
+				Fields: []webhook.EmbedField{
+					{
+						Name:   "💸 Intäkt",
+						Value:  "",
+						Inline: inlineFields,
+					},
+					{
+						Name:   "Förändring",
+						Value:  changeText,
+						Inline: inlineFields,
+					},
+					{
+						Name:   "Föregående mätning",
+						Value:  fmt.Sprintf("🗓️ %dst besökare vid mätning %s UTC.", pastAttendees.Count, pastAttendees.Datetime),
+						Inline: inlineFields,
+					},
+				},
+			},
+		},
+	}
+	webhook.Send(config.WebhookUrl, message)
 }
 
 func Job(config Config) {
