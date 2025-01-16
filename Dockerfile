@@ -5,7 +5,7 @@ COPY go.mod go.sum ./
 # Download dependencies
 RUN go mod download
 # Copy source code
-COPY *.go ./
+COPY . .
 # Build for arm64
 RUN GOOS=linux GOARCH=arm64 go build -o main .
 
