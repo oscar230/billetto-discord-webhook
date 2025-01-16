@@ -7,7 +7,7 @@ import (
 	"oscar230/billetto-discord-webhook/discord"
 	"time"
 
-	"github.com/robfig/cron"
+	"github.com/robfig/cron/v3"
 )
 
 func Job(webhookUrl string, eventId int, eventTitle, eventUrl, eventImageUrl, priceCurrency string, priceList []Price) {
