@@ -4,3 +4,11 @@ event: 123456
 event_title: "Example event!"
 event_url: "https://example.com/"
 event_image_url: "https://example.com/image.png"
+price_currency: "SEK"
+price_list:
+  - price: 25
+    amount: 3
+  - price: 100
+    amount: 10
+  - price: 200
+    amount: 200

@@ -7,11 +7,11 @@ import (
 	"time"
 )
 
-func Job(webhookUrl string, eventId int, eventTitle, eventUrl, eventImageUrl string) {
+func Job(webhookUrl string, eventId int, eventTitle, eventUrl, eventImageUrl, priceCurrency string, priceList []Price) {
 	log.Printf("Running job for event %d", eventId)
 
 	// Get current attendees
-	eventAttendeeCount := 12 // billetto.EventAttendeeCount(eventId)
+	eventAttendeeCount := 1233 // billetto.EventAttendeeCount(eventId)
 	currentAttendees := Attendees{
 		Datetime: time.Now().UTC().Format(time.RFC3339),
 		Count:    eventAttendeeCount,
@@ -31,12 +31,10 @@ func Job(webhookUrl string, eventId int, eventTitle, eventUrl, eventImageUrl str
 	if currentAttendees.Count != pastAttendees.Count && pastAttendees.Count != -1 {
 		// Create the message variables
 		var changeText string
-		if currentAttendees.Count > pastAttendees.Count {
+		if currentAttendees.Count >= pastAttendees.Count {
 			changeText = fmt.Sprintf("↗️ Detta är en ökning med %d besökare.\n", currentAttendees.Count-pastAttendees.Count)
-		} else if currentAttendees.Count < pastAttendees.Count {
-			changeText = fmt.Sprintf("↘️ Detta är en minskning med %d besökare.\n", pastAttendees.Count-currentAttendees.Count)
 		} else {
-			changeText = ""
+			changeText = fmt.Sprintf("↘️ Detta är en minskning med %d besökare.\n", pastAttendees.Count-currentAttendees.Count)
 		}
 
 		// Create the message
@@ -53,7 +51,7 @@ func Job(webhookUrl string, eventId int, eventTitle, eventUrl, eventImageUrl str
 					Fields: []discord.EmbedField{
 						{
 							Name:   "💸 Intäkt",
-							Value:  "123",
+							Value:  GetRevenue(priceList, priceCurrency, currentAttendees.Count),
 							Inline: inlineFields,
 						},
 						{
@@ -81,7 +79,7 @@ func main() {
 	config := loadConfig()
 	log.Print("Loaded configuration")
 
-	Job(config.WebhookUrl, config.Event, config.Title, config.Url, config.ImageUrl)
+	Job(config.WebhookUrl, config.Event, config.Title, config.Url, config.ImageUrl, config.PriceCurrency, config.PriceList)
 
 	// // Create a new cron scheduler
 	// scheduler := cron.New()
