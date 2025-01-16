@@ -1,4 +1,4 @@
-package webhook
+package discord
 
 import (
 	"bytes"
@@ -63,7 +63,7 @@ func Send(webhookUrl string, message Message) {
 	if err != nil {
 		log.Fatal("failed to create HTTP request: %w", err)
 	}
-	log.Printf("HTTP POST %s\n%s", req.URL, req.Body)
+	log.Printf("HTTP POST %s\n%s", req.URL, messageBytes)
 
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
