@@ -20,10 +20,8 @@ import (
 
 type Config struct {
 	CronExpression string `yaml:"interval"`
-	BaseUrl        string `yaml:"base_url"`
 	WebhookUrl     string `yaml:"webhook"`
 	Event          int    `yaml:"event"`
-	Silent         bool   `yaml:"silent"`
 	Title          string `yaml:"event_title"`
 	Url            string `yaml:"event_url"`
 	ImageUrl       string `yaml:"event_image_url"`
