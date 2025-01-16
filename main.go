@@ -3,15 +3,18 @@ package main
 import (
 	"fmt"
 	"log"
+	"oscar230/billetto-discord-webhook/billetto"
 	"oscar230/billetto-discord-webhook/discord"
 	"time"
+
+	"github.com/robfig/cron"
 )
 
 func Job(webhookUrl string, eventId int, eventTitle, eventUrl, eventImageUrl, priceCurrency string, priceList []Price) {
 	log.Printf("Running job for event %d", eventId)
 
 	// Get current attendees
-	eventAttendeeCount := 1233 // billetto.EventAttendeeCount(eventId)
+	eventAttendeeCount := billetto.EventAttendeeCount(eventId)
 	currentAttendees := Attendees{
 		Datetime: time.Now().UTC().Format(time.RFC3339),
 		Count:    eventAttendeeCount,
@@ -43,15 +46,15 @@ func Job(webhookUrl string, eventId int, eventTitle, eventUrl, eventImageUrl, pr
 			Embeds: []discord.Embed{
 				{
 					Title:       eventTitle,
-					Description: fmt.Sprintf("# 🎟️ %d besökare", currentAttendees.Count),
+					Description: fmt.Sprintf("# %d besökare", currentAttendees.Count),
 					URL:         eventUrl,
 					Image: discord.EmbedImage{
 						URL: eventImageUrl,
 					},
 					Fields: []discord.EmbedField{
 						{
-							Name:   "💸 Intäkt",
-							Value:  GetRevenue(priceList, priceCurrency, currentAttendees.Count),
+							Name:   "Intäkt",
+							Value:  fmt.Sprintf("💸 %s", GetRevenue(priceList, priceCurrency, currentAttendees.Count)),
 							Inline: inlineFields,
 						},
 						{
@@ -79,18 +82,18 @@ func main() {
 	config := loadConfig()
 	log.Print("Loaded configuration")
 
-	Job(config.WebhookUrl, config.Event, config.Title, config.Url, config.ImageUrl, config.PriceCurrency, config.PriceList)
+	// Create a new cron scheduler
+	scheduler := cron.New()
 
-	// // Create a new cron scheduler
-	// scheduler := cron.New()
+	// Add a task with a cron expression
+	scheduler.AddFunc(config.CronExpression, func() {
+		Job(config.WebhookUrl, config.Event, config.Title, config.Url, config.ImageUrl, config.PriceCurrency, config.PriceList)
+	})
 
-	// // Add a task with a cron expression
-	// scheduler.AddFunc(config.CronExpression, func() { Job(config.WebhookUrl, config.Event, config.Title, config.Url, config.ImageUrl) })
+	// Start the cron scheduler
+	scheduler.Start()
+	log.Printf("Scheduler started at system time: %s", time.Now())
 
-	// // Start the cron scheduler
-	// scheduler.Start()
-	// log.Printf("Scheduler started at system time: %s", time.Now())
-
-	// // Keep the program running to observe scheduled tasks
-	// select {}
+	// Keep the program running to observe scheduled tasks
+	select {}
 }
