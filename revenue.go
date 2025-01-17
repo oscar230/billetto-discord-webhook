@@ -12,7 +12,7 @@ func GetRevenue(priceList []Price, currency string, sales int) string {
 	})
 
 	totalSales := float32(0)
-	totalSalesText := "Prislista;"
+	totalSalesText := ""
 	for _, entry := range priceList {
 		if sales <= 0 {
 			break
@@ -21,7 +21,7 @@ func GetRevenue(priceList []Price, currency string, sales int) string {
 		// Determine how much we can sell at this price
 		sellAmount := min(sales, entry.Amount)
 		totalSales += float32(sellAmount) * entry.Price
-		totalSalesText += fmt.Sprintf("\n* %d st à %.2f %s/st", sellAmount, entry.Price, currency)
+		totalSalesText += fmt.Sprintf("\n  * %d st à %.2f %s/st", sellAmount, entry.Price, currency)
 		if sellAmount == entry.Amount {
 			totalSalesText += " (slutsålt)"
 		} else {
@@ -29,7 +29,7 @@ func GetRevenue(priceList []Price, currency string, sales int) string {
 		}
 		sales -= sellAmount
 	}
-	totalSalesText = fmt.Sprintf("%.2f %s\n%s\n*Priset baseras på antagandet att alla köper den billigaste biljetten tillgänglig.*", totalSales, currency, totalSalesText)
+	totalSalesText = fmt.Sprintf("* Totalt: %.2f %s%s", totalSales, currency, totalSalesText)
 
 	if sales > 0 {
 		totalSalesText += fmt.Sprintf("\n⚠️ **Fel**: Det har sålts %d fler biljetter än vad som är definierade i prislistan! Inget är fel på Billetto, bara denna övervakare.", sales)

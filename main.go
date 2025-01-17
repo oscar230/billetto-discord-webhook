@@ -35,9 +35,9 @@ func Job(webhookUrl string, eventId int, eventTitle, eventUrl, eventImageUrl, pr
 		// Create the message variables
 		var changeText string
 		if currentAttendees.Count >= pastAttendees.Count {
-			changeText = fmt.Sprintf("↗️ Detta är en ökning med %d besökare.\n", currentAttendees.Count-pastAttendees.Count)
+			changeText = fmt.Sprintf("Detta är en ökning med %d besökare.\n", currentAttendees.Count-pastAttendees.Count)
 		} else {
-			changeText = fmt.Sprintf("↘️ Detta är en minskning med %d besökare.\n", pastAttendees.Count-currentAttendees.Count)
+			changeText = fmt.Sprintf("Detta är en minskning med %d besökare.\n", pastAttendees.Count-currentAttendees.Count)
 		}
 
 		// Create the message
@@ -46,15 +46,18 @@ func Job(webhookUrl string, eventId int, eventTitle, eventUrl, eventImageUrl, pr
 			Embeds: []discord.Embed{
 				{
 					Title:       eventTitle,
-					Description: fmt.Sprintf("# %d besökare", currentAttendees.Count),
+					Description: fmt.Sprintf("# %d st sålda biljetter\n*Intäkternas summa baseras på antagandet att alla gäster köper den billigaste biljetten tillgänglig. Intäkter är inkl. moms. Detta program kollar Billetto varje dag 12:00, om ingen förändring har skett så skickas inget meddelande.*\n", currentAttendees.Count),
 					URL:         eventUrl,
 					Image: discord.EmbedImage{
 						URL: eventImageUrl,
 					},
+					Footer: discord.EmbedFooter{
+						Text: "Av Oscar, för Klanglandet.",
+					},
 					Fields: []discord.EmbedField{
 						{
-							Name:   "Intäkt",
-							Value:  fmt.Sprintf("💸 %s", GetRevenue(priceList, priceCurrency, currentAttendees.Count)),
+							Name:   "Intäkter",
+							Value:  GetRevenue(priceList, priceCurrency, currentAttendees.Count),
 							Inline: inlineFields,
 						},
 						{
@@ -64,7 +67,7 @@ func Job(webhookUrl string, eventId int, eventTitle, eventUrl, eventImageUrl, pr
 						},
 						{
 							Name:   "Föregående mätning",
-							Value:  fmt.Sprintf("🗓️ %dst besökare vid mätning %s UTC.", pastAttendees.Count, pastAttendees.Datetime),
+							Value:  fmt.Sprintf("%dst besökare vid mätning %s UTC.", pastAttendees.Count, pastAttendees.Datetime),
 							Inline: inlineFields,
 						},
 					},
