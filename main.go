@@ -87,7 +87,7 @@ func main() {
 	})
 
 	// Debug, start now
-	Job(config.WebhookUrl, config.Event, config.EventImageUrl, config.AccessKeyId, config.AccessKeySecret)
+	// Job(config.WebhookUrl, config.Event, config.EventImageUrl, config.AccessKeyId, config.AccessKeySecret)
 
 	// Start the cron scheduler
 	scheduler.Start()
