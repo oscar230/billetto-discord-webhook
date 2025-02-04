@@ -8,19 +8,12 @@ import (
 )
 
 type Config struct {
-	CronExpression string  `yaml:"interval"`
-	WebhookUrl     string  `yaml:"webhook"`
-	Event          int     `yaml:"event"`
-	Title          string  `yaml:"event_title"`
-	Url            string  `yaml:"event_url"`
-	ImageUrl       string  `yaml:"event_image_url"`
-	PriceCurrency  string  `yaml:"price_currency"`
-	PriceList      []Price `yaml:"price_list"`
-}
-
-type Price struct {
-	Price  float32 `yaml:"price"`
-	Amount int     `yaml:"amount"`
+	CronExpression  string `yaml:"interval"`
+	WebhookUrl      string `yaml:"discord_webhook"`
+	Event           int    `yaml:"billetto_event_id"`
+	EventImageUrl   string `yaml:"billetto_event_image_url"`
+	AccessKeyId     string `yaml:"billetto_access_key_id"`
+	AccessKeySecret string `yaml:"billetto_access_key_secret"`
 }
 
 func loadConfig() Config {

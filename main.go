@@ -10,14 +10,15 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-func Job(webhookUrl string, eventId int, eventTitle, eventUrl, eventImageUrl, priceCurrency string, priceList []Price) {
+func Job(webhookUrl string, eventId int, eventImageUrl, AccessKeyId, AccessKeySecret string) {
 	log.Printf("Running job for event %d", eventId)
 
 	// Get current attendees
-	eventAttendeeCount := billetto.EventAttendeeCount(eventId)
+	eventInfo := billetto.GetEventInfo(eventId, AccessKeyId, AccessKeySecret)
+	eventAttendees := billetto.GetEventAttendees(eventId, AccessKeyId, AccessKeySecret)
 	currentAttendees := Attendees{
 		Datetime: time.Now().UTC().Format(time.RFC3339),
-		Count:    eventAttendeeCount,
+		Count:    eventAttendees.Total,
 	}
 
 	// Get past attendees
@@ -35,9 +36,9 @@ func Job(webhookUrl string, eventId int, eventTitle, eventUrl, eventImageUrl, pr
 		// Create the message variables
 		var changeText string
 		if currentAttendees.Count >= pastAttendees.Count {
-			changeText = fmt.Sprintf("Detta är en ökning med %d besökare.\n", currentAttendees.Count-pastAttendees.Count)
+			changeText = fmt.Sprintf("Detta är en ökning med %d besökare sedan senaste mätning.\n", currentAttendees.Count-pastAttendees.Count)
 		} else {
-			changeText = fmt.Sprintf("Detta är en minskning med %d besökare.\n", pastAttendees.Count-currentAttendees.Count)
+			changeText = fmt.Sprintf("Detta är en minskning med %d besökare sedan senaste mätning..\n", pastAttendees.Count-currentAttendees.Count)
 		}
 
 		// Create the message
@@ -45,21 +46,13 @@ func Job(webhookUrl string, eventId int, eventTitle, eventUrl, eventImageUrl, pr
 		message := discord.Message{
 			Embeds: []discord.Embed{
 				{
-					Title:       eventTitle,
-					Description: fmt.Sprintf("# %d st sålda biljetter\n*Intäkternas summa baseras på antagandet att alla gäster köper den billigaste biljetten tillgänglig. Intäkter är inkl. moms. Detta program kollar Billetto varje dag 12:00, om ingen förändring har skett så skickas inget meddelande.*\n", currentAttendees.Count),
-					URL:         eventUrl,
+					Title:       eventInfo.Name,
+					Description: fmt.Sprintf("# %d st sålda biljetter", currentAttendees.Count),
+					URL:         eventInfo.PublicURL,
 					Image: discord.EmbedImage{
 						URL: eventImageUrl,
 					},
-					Footer: discord.EmbedFooter{
-						Text: "Av Oscar, för Klanglandet.",
-					},
 					Fields: []discord.EmbedField{
-						{
-							Name:   "Intäkter",
-							Value:  GetRevenue(priceList, priceCurrency, currentAttendees.Count),
-							Inline: inlineFields,
-						},
 						{
 							Name:   "Förändring",
 							Value:  changeText,
@@ -90,8 +83,11 @@ func main() {
 
 	// Add a task with a cron expression
 	scheduler.AddFunc(config.CronExpression, func() {
-		Job(config.WebhookUrl, config.Event, config.Title, config.Url, config.ImageUrl, config.PriceCurrency, config.PriceList)
+		Job(config.WebhookUrl, config.Event, config.EventImageUrl, config.AccessKeyId, config.AccessKeySecret)
 	})
+
+	// Debug, start now
+	Job(config.WebhookUrl, config.Event, config.EventImageUrl, config.AccessKeyId, config.AccessKeySecret)
 
 	// Start the cron scheduler
 	scheduler.Start()
