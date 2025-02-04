@@ -10,12 +10,12 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-func Job(webhookUrl string, eventId int, eventImageUrl, AccessKeyId, AccessKeySecret string) {
-	log.Printf("Running job for event %d", eventId)
+func Job(config Config) {
+	log.Printf("Running job for event %d", config.BillettoEventId)
 
 	// Get current attendees
-	eventInfo, _ := billetto.GetEventInfo(eventId, AccessKeyId, AccessKeySecret)
-	eventAttendees, xRatelimitRemaining := billetto.GetEventAttendees(eventId, AccessKeyId, AccessKeySecret)
+	eventAttendees, xRatelimitRemaining := billetto.GetEventAttendees(config.BillettoEventId, config.BillettoAccessKeyId, config.BillettoAccessKeySecret)
+	log.Printf("Billetto API points left: %s", xRatelimitRemaining)
 	currentAttendees := Attendees{
 		Datetime: time.Now().UTC().Format(time.RFC3339),
 		Count:    eventAttendees.Total,
@@ -46,14 +46,11 @@ func Job(webhookUrl string, eventId int, eventImageUrl, AccessKeyId, AccessKeySe
 		message := discord.Message{
 			Embeds: []discord.Embed{
 				{
-					Title:       eventInfo.Name,
+					Title:       config.BillettoEventName,
 					Description: fmt.Sprintf("# %d st sålda biljetter", currentAttendees.Count),
-					URL:         eventInfo.PublicURL,
+					URL:         config.BillettoEventUrl,
 					Image: discord.EmbedImage{
-						URL: eventImageUrl,
-					},
-					Footer: discord.EmbedFooter{
-						Text: fmt.Sprintf("Kvarstående API-poäng: %s", xRatelimitRemaining),
+						URL: config.BillettoEventImageUrl,
 					},
 					Fields: []discord.EmbedField{
 						{
@@ -70,7 +67,7 @@ func Job(webhookUrl string, eventId int, eventImageUrl, AccessKeyId, AccessKeySe
 				},
 			},
 		}
-		discord.Send(webhookUrl, message)
+		discord.Send(config.DiscordWebhookUrl, message)
 	} else {
 		log.Printf("Current is %d (now) and past is %d (%s), there is nothing to do.", currentAttendees.Count, pastAttendees.Count, pastAttendees.Datetime)
 	}
@@ -85,8 +82,8 @@ func main() {
 	scheduler := cron.New()
 
 	// Add a task with a cron expression
-	scheduler.AddFunc(config.CronExpression, func() {
-		Job(config.WebhookUrl, config.Event, config.EventImageUrl, config.AccessKeyId, config.AccessKeySecret)
+	scheduler.AddFunc(config.SchedulerCronExpression, func() {
+		Job(config)
 	})
 
 	// Start the cron scheduler

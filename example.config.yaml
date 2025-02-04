@@ -1,5 +1,8 @@
-interval: "0 */1 * * *"
-webhook: "https://example.com/api/webhooks/123abc"
+cron: "0 */1 * * *"
+discord_webhook: "https://example.com/api/webhooks/123abc"
 billetto_event_id: 123456
+billetto_event_name: "Example Event"
+billetto_event_url: "https://example.com/"
+billetto_event_image_url: "https://example.com/image.png"
 billetto_access_key_id: "ABC"
 billetto_access_key_secret: "ABC"

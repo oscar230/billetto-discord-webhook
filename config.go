@@ -8,12 +8,14 @@ import (
 )
 
 type Config struct {
-	CronExpression  string `yaml:"interval"`
-	WebhookUrl      string `yaml:"discord_webhook"`
-	Event           int    `yaml:"billetto_event_id"`
-	EventImageUrl   string `yaml:"billetto_event_image_url"`
-	AccessKeyId     string `yaml:"billetto_access_key_id"`
-	AccessKeySecret string `yaml:"billetto_access_key_secret"`
+	SchedulerCronExpression string `yaml:"cron"`
+	DiscordWebhookUrl       string `yaml:"discord_webhook"`
+	BillettoEventId         int    `yaml:"billetto_event_id"`
+	BillettoEventName       string `yaml:"billetto_event_name"`
+	BillettoEventUrl        string `yaml:"billetto_event_url"`
+	BillettoEventImageUrl   string `yaml:"billetto_event_image_url"`
+	BillettoAccessKeyId     string `yaml:"billetto_access_key_id"`
+	BillettoAccessKeySecret string `yaml:"billetto_access_key_secret"`
 }
 
 func loadConfig() Config {
