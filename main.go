@@ -14,8 +14,8 @@ func Job(webhookUrl string, eventId int, eventImageUrl, AccessKeyId, AccessKeySe
 	log.Printf("Running job for event %d", eventId)
 
 	// Get current attendees
-	eventInfo := billetto.GetEventInfo(eventId, AccessKeyId, AccessKeySecret)
-	eventAttendees := billetto.GetEventAttendees(eventId, AccessKeyId, AccessKeySecret)
+	eventInfo, _ := billetto.GetEventInfo(eventId, AccessKeyId, AccessKeySecret)
+	eventAttendees, xRatelimitRemaining := billetto.GetEventAttendees(eventId, AccessKeyId, AccessKeySecret)
 	currentAttendees := Attendees{
 		Datetime: time.Now().UTC().Format(time.RFC3339),
 		Count:    eventAttendees.Total,
@@ -52,6 +52,9 @@ func Job(webhookUrl string, eventId int, eventImageUrl, AccessKeyId, AccessKeySe
 					Image: discord.EmbedImage{
 						URL: eventImageUrl,
 					},
+					Footer: discord.EmbedFooter{
+						Text: fmt.Sprintf("Kvarstående API-poäng: %s", xRatelimitRemaining),
+					},
 					Fields: []discord.EmbedField{
 						{
 							Name:   "Förändring",
@@ -85,9 +88,6 @@ func main() {
 	scheduler.AddFunc(config.CronExpression, func() {
 		Job(config.WebhookUrl, config.Event, config.EventImageUrl, config.AccessKeyId, config.AccessKeySecret)
 	})
-
-	// Debug, start now
-	// Job(config.WebhookUrl, config.Event, config.EventImageUrl, config.AccessKeyId, config.AccessKeySecret)
 
 	// Start the cron scheduler
 	scheduler.Start()

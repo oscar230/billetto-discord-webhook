@@ -91,7 +91,7 @@ type EventAttendees struct {
 	NextURL string `json:"next_url,omitempty"`
 }
 
-func GetEventInfo(eventId int, AccessKeyId, AccessKeySecret string) Event {
+func GetEventInfo(eventId int, AccessKeyId, AccessKeySecret string) (Event, string) {
 	// Build url
 	url := fmt.Sprintf("https://billetto.dk/api/v3/organiser/events/%d", eventId)
 
@@ -125,10 +125,10 @@ func GetEventInfo(eventId int, AccessKeyId, AccessKeySecret string) Event {
 		log.Fatal("Error unmarshalling JSON:", err)
 	}
 
-	return data
+	return data, resp.Header.Get("x-ratelimit-remaining")
 }
 
-func GetEventAttendees(eventId int, AccessKeyId, AccessKeySecret string) EventAttendees {
+func GetEventAttendees(eventId int, AccessKeyId, AccessKeySecret string) (EventAttendees, string) {
 	// Build url
 	url := fmt.Sprintf("https://billetto.dk/api/v3/organiser/events/%d/attendees?limit=0", eventId)
 
@@ -162,5 +162,5 @@ func GetEventAttendees(eventId int, AccessKeyId, AccessKeySecret string) EventAt
 		log.Fatal("Error unmarshalling JSON:", err)
 	}
 
-	return data
+	return data, resp.Header.Get("x-ratelimit-remaining")
 }
