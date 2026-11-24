@@ -27,3 +27,4 @@ go.work.sum
 # Application specific
 config.yaml
 event.json
+.vscode/settings.json
